@@ -1,10 +1,9 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Zap, LayoutDashboard, History, Settings, Plus } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Zap, LayoutDashboard, History, Settings, Plus, LogOut } from 'lucide-react';
 import { Button } from '../ui/button';
-import { cn } from '@/lib/utils';
+import { cn, apiFetch } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Workflows', icon: LayoutDashboard },
@@ -15,6 +14,7 @@ const NAV_ITEMS = [
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [creating, setCreating] = useState(false);
 
   async function handleNew() {
@@ -30,6 +30,11 @@ export function AppShell() {
     } finally {
       setCreating(false);
     }
+  }
+
+  async function handleLogout() {
+    await signOut();
+    navigate('/auth/login', { replace: true });
   }
 
   return (
@@ -56,11 +61,23 @@ export function AppShell() {
             </Link>
           ))}
         </nav>
-        <div className="p-3 border-t">
+        <div className="p-3 space-y-2 border-t">
           <Button onClick={handleNew} disabled={creating} className="w-full" size="sm">
             <Plus className="h-4 w-4 mr-2" />
             New Workflow
           </Button>
+          <div className="flex items-center justify-between px-1 py-1">
+            <span className="text-xs text-muted-foreground truncate max-w-[160px]" title={user?.email || ''}>
+              {user?.email}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </aside>
       <main className="flex-1 overflow-auto">

@@ -6,17 +6,16 @@ import { N8nWorkflowJson } from '../../../shared/src/workflow';
 
 export const webhookRoutes = Router();
 
-// Dynamic webhook handler
+// Dynamic webhook handler — no auth required (external triggers)
 webhookRoutes.all('/:webhookId', async (req: Request, res: Response) => {
   const { webhookId } = req.params;
 
-  // Find workflow with matching webhook
-  const workflows = workflowRepo.findAll();
-  let matchedWorkflow: { id: string; workflow_json: string } | undefined;
+  // Find active workflow with matching webhook across all users
+  const workflows = await workflowRepo.findAllActive();
+  let matchedWorkflow: { id: string; user_id: string; workflow_json: string } | undefined;
   let matchedNode: any;
 
   for (const wf of workflows) {
-    if (!wf.is_active) continue;
     try {
       const json: N8nWorkflowJson = JSON.parse(wf.workflow_json);
       for (const node of json.nodes) {
@@ -39,7 +38,7 @@ webhookRoutes.all('/:webhookId', async (req: Request, res: Response) => {
   }
 
   const json: N8nWorkflowJson = JSON.parse(matchedWorkflow.workflow_json);
-  const executionId = executionRepo.create(matchedWorkflow.id, 'webhook');
+  const executionId = await executionRepo.create(matchedWorkflow.id, matchedWorkflow.user_id, 'webhook');
 
   const triggerData = {
     headers: req.headers,
@@ -57,9 +56,8 @@ webhookRoutes.all('/:webhookId', async (req: Request, res: Response) => {
 
   const responseMode = matchedNode?.parameters?.responseMode;
   if (responseMode === 'lastNode') {
-    // Wait a bit for execution
     await new Promise(r => setTimeout(r, 5000));
-    const exec = executionRepo.findById(executionId);
+    const exec = await executionRepo.findById(executionId);
     res.json({ executionId, status: exec?.status || 'running' });
   } else {
     res.json({ executionId, message: 'Webhook received, execution started' });

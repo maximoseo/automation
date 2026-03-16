@@ -1,12 +1,17 @@
-import { v4 as uuid } from 'uuid';
-import { getDb, saveDatabase } from '../schema';
 import crypto from 'crypto';
+import { supabase } from '../../lib/supabase';
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+function getEncryptionKey(): string {
+  const key = process.env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error('Missing ENCRYPTION_KEY environment variable — credentials cannot be encrypted without it');
+  }
+  return key;
+}
 
 function getKeyBuffer(): Buffer {
-  return Buffer.from(KEY.slice(0, 64).padEnd(64, '0'), 'hex');
+  return Buffer.from(getEncryptionKey().slice(0, 64).padEnd(64, '0'), 'hex');
 }
 
 function encrypt(text: string): string {
@@ -31,6 +36,7 @@ function decrypt(encryptedText: string): string {
 
 export interface CredentialRow {
   id: string;
+  user_id: string;
   name: string;
   type: string;
   data: string;
@@ -39,81 +45,90 @@ export interface CredentialRow {
 }
 
 export const credentialRepo = {
-  findAll(): Omit<CredentialRow, 'data'>[] {
-    const stmt = getDb().prepare('SELECT id, name, type, created_at, updated_at FROM credentials ORDER BY updated_at DESC');
-    const rows: Omit<CredentialRow, 'data'>[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject() as unknown as Omit<CredentialRow, 'data'>);
-    }
-    stmt.free();
-    return rows;
+  async findAll(userId: string): Promise<Omit<CredentialRow, 'data'>[]> {
+    const { data, error } = await supabase
+      .from('credentials')
+      .select('id, user_id, name, type, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch credentials: ${error.message}`);
+    return data || [];
   },
 
-  findById(id: string): CredentialRow | undefined {
-    const stmt = getDb().prepare('SELECT * FROM credentials WHERE id = ?');
-    stmt.bind([id]);
-    let row: CredentialRow | undefined;
-    if (stmt.step()) {
-      row = stmt.getAsObject() as unknown as CredentialRow;
-    }
-    stmt.free();
-    return row;
+  async findById(id: string, userId: string): Promise<CredentialRow | undefined> {
+    const { data, error } = await supabase
+      .from('credentials')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return undefined;
+    return data;
   },
 
-  findByType(type: string): CredentialRow[] {
-    const stmt = getDb().prepare('SELECT * FROM credentials WHERE type = ?');
-    stmt.bind([type]);
-    const rows: CredentialRow[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject() as unknown as CredentialRow);
-    }
-    stmt.free();
-    return rows;
+  async findByType(type: string, userId: string): Promise<CredentialRow[]> {
+    const { data, error } = await supabase
+      .from('credentials')
+      .select('*')
+      .eq('type', type)
+      .eq('user_id', userId);
+
+    if (error) throw new Error(`Failed to fetch credentials: ${error.message}`);
+    return data || [];
   },
 
-  create(data: { name: string; type: string; data: Record<string, unknown> }): string {
-    const id = uuid();
-    const now = new Date().toISOString();
+  async create(userId: string, data: { name: string; type: string; data: Record<string, unknown> }): Promise<string> {
     const encryptedData = encrypt(JSON.stringify(data.data));
-    getDb().run(
-      'INSERT INTO credentials (id, name, type, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, data.name, data.type, encryptedData, now, now]
-    );
-    saveDatabase();
-    return id;
+
+    const { data: row, error } = await supabase
+      .from('credentials')
+      .insert({
+        user_id: userId,
+        name: data.name,
+        type: data.type,
+        data: encryptedData,
+      })
+      .select('id')
+      .single();
+
+    if (error || !row) throw new Error(`Failed to create credential: ${error?.message}`);
+    return row.id;
   },
 
-  update(id: string, data: { name?: string; type?: string; data?: Record<string, unknown> }): boolean {
-    const existing = this.findById(id);
-    if (!existing) return false;
+  async update(id: string, userId: string, data: { name?: string; type?: string; data?: Record<string, unknown> }): Promise<boolean> {
+    const updates: Record<string, unknown> = {};
 
-    const updates: string[] = [];
-    const values: unknown[] = [];
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.type !== undefined) updates.type = data.type;
+    if (data.data !== undefined) updates.data = encrypt(JSON.stringify(data.data));
 
-    if (data.name !== undefined) { updates.push('name = ?'); values.push(data.name); }
-    if (data.type !== undefined) { updates.push('type = ?'); values.push(data.type); }
-    if (data.data !== undefined) { updates.push('data = ?'); values.push(encrypt(JSON.stringify(data.data))); }
+    if (Object.keys(updates).length === 0) return true;
 
-    if (updates.length === 0) return true;
-    updates.push('updated_at = ?');
-    values.push(new Date().toISOString());
-    values.push(id);
+    const { error } = await supabase
+      .from('credentials')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', userId);
 
-    getDb().run(`UPDATE credentials SET ${updates.join(', ')} WHERE id = ?`, values);
-    saveDatabase();
+    if (error) throw new Error(`Failed to update credential: ${error.message}`);
     return true;
   },
 
-  delete(id: string): boolean {
-    const existing = this.findById(id);
-    if (!existing) return false;
-    getDb().run('DELETE FROM credentials WHERE id = ?', [id]);
-    saveDatabase();
+  async delete(id: string, userId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('credentials')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) throw new Error(`Failed to delete credential: ${error.message}`);
     return true;
   },
 
-  getDecryptedData(id: string): Record<string, unknown> | null {
-    const row = this.findById(id);
+  async getDecryptedData(id: string, userId: string): Promise<Record<string, unknown> | null> {
+    const row = await this.findById(id, userId);
     if (!row) return null;
     try {
       return JSON.parse(decrypt(row.data));

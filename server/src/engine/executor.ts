@@ -51,13 +51,12 @@ export async function executeWorkflow(
       const dagNode = dag.nodes.get(nodeName);
       if (!dagNode) continue;
       if (dagNode.disabled) {
-        // Skip disabled nodes, pass through input
         const parentOutputs = getNodeInputs(dag, nodeName, nodeOutputs);
         nodeOutputs.set(nodeName, [parentOutputs[0] || { items: [{ json: {} }] }]);
         continue;
       }
 
-      const nodeExecId = executionRepo.createNodeExecution({
+      const nodeExecId = await executionRepo.createNodeExecution({
         executionId,
         nodeName,
         nodeType: dagNode.type,
@@ -74,7 +73,6 @@ export async function executeWorkflow(
       try {
         const inputs = getNodeInputs(dag, nodeName, nodeOutputs);
 
-        // Inject trigger data for trigger nodes
         if (triggerData && dag.triggers.includes(nodeName)) {
           inputs[0] = { items: [{ json: triggerData }] };
         }
@@ -94,7 +92,6 @@ export async function executeWorkflow(
         if (executor) {
           outputs = await executor(context);
         } else {
-          // Unknown node type - pass through with warning
           outputs = [{
             items: [{
               json: {
@@ -109,7 +106,7 @@ export async function executeWorkflow(
         nodeOutputs.set(nodeName, outputs);
         const executionTimeMs = Date.now() - startTime;
 
-        executionRepo.updateNodeExecution(nodeExecId, {
+        await executionRepo.updateNodeExecution(nodeExecId, {
           status: 'success',
           inputData: JSON.stringify(inputs[0]?.items?.slice(0, 10)),
           outputData: JSON.stringify(outputs[0]?.items?.slice(0, 10)),
@@ -128,7 +125,7 @@ export async function executeWorkflow(
         const executionTimeMs = Date.now() - startTime;
         const errorMsg = (err as Error).message;
 
-        executionRepo.updateNodeExecution(nodeExecId, {
+        await executionRepo.updateNodeExecution(nodeExecId, {
           status: 'error',
           error: errorMsg,
           executionTimeMs,
@@ -146,14 +143,13 @@ export async function executeWorkflow(
           throw new Error(`Node "${nodeName}" failed: ${errorMsg}`);
         }
 
-        // Continue with error output
         nodeOutputs.set(nodeName, [{
           items: [{ json: { error: errorMsg, _continueOnFail: true } }],
         }]);
       }
     }
 
-    executionRepo.updateStatus(executionId, 'success');
+    await executionRepo.updateStatus(executionId, 'success');
     sseService.emit(executionId, 'execution:complete', {
       executionId,
       status: 'success',
@@ -161,7 +157,7 @@ export async function executeWorkflow(
     });
   } catch (err) {
     const errorMsg = (err as Error).message;
-    executionRepo.updateStatus(executionId, 'error', errorMsg);
+    await executionRepo.updateStatus(executionId, 'error', errorMsg);
     sseService.emit(executionId, 'execution:error', {
       executionId,
       status: 'error',
@@ -192,7 +188,6 @@ function getNodeInputs(
     inputs[edge.toInput].items.push(...outputData.items);
   }
 
-  // If no inputs, provide empty default
   if (Object.keys(inputs).length === 0) {
     inputs[0] = { items: [{ json: {} }] };
   }

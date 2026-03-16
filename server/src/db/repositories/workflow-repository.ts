@@ -1,102 +1,178 @@
-import { v4 as uuid } from 'uuid';
-import { getDb, saveDatabase } from '../schema';
+import { supabase } from '../../lib/supabase';
 
 export interface WorkflowRow {
   id: string;
+  user_id: string;
   name: string;
   description: string;
-  workflow_json: string;
-  is_active: number;
+  workflow_json: any;
+  is_active: boolean;
   node_count: number;
-  has_unsupported_nodes: number;
+  has_unsupported_nodes: boolean;
   created_at: string;
   updated_at: string;
+  last_execution_status?: string;
+  last_execution_at?: string;
 }
 
 export const workflowRepo = {
-  findAll(): WorkflowRow[] {
-    const stmt = getDb().prepare(`
-      SELECT w.*, e.status as last_execution_status, e.created_at as last_execution_at
-      FROM workflows w
-      LEFT JOIN (
-        SELECT workflow_id, status, created_at,
-          ROW_NUMBER() OVER (PARTITION BY workflow_id ORDER BY created_at DESC) as rn
-        FROM executions
-      ) e ON e.workflow_id = w.id AND e.rn = 1
-      ORDER BY w.updated_at DESC
-    `);
-    const rows: WorkflowRow[] = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject() as unknown as WorkflowRow);
+  async findAll(userId: string): Promise<WorkflowRow[]> {
+    const { data: workflows, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch workflows: ${error.message}`);
+    if (!workflows) return [];
+
+    // Get latest execution status for each workflow
+    const workflowIds = workflows.map(w => w.id);
+    if (workflowIds.length === 0) return workflows;
+
+    const { data: executions } = await supabase
+      .from('executions')
+      .select('workflow_id, status, created_at')
+      .in('workflow_id', workflowIds)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    const latestExecMap = new Map<string, { status: string; created_at: string }>();
+    if (executions) {
+      for (const e of executions) {
+        if (!latestExecMap.has(e.workflow_id)) {
+          latestExecMap.set(e.workflow_id, { status: e.status, created_at: e.created_at });
+        }
+      }
     }
-    stmt.free();
-    return rows;
+
+    return workflows.map(w => ({
+      ...w,
+      workflow_json: typeof w.workflow_json === 'string' ? w.workflow_json : JSON.stringify(w.workflow_json),
+      last_execution_status: latestExecMap.get(w.id)?.status,
+      last_execution_at: latestExecMap.get(w.id)?.created_at,
+    }));
   },
 
-  findById(id: string): WorkflowRow | undefined {
-    const stmt = getDb().prepare('SELECT * FROM workflows WHERE id = ?');
-    stmt.bind([id]);
-    let row: WorkflowRow | undefined;
-    if (stmt.step()) {
-      row = stmt.getAsObject() as unknown as WorkflowRow;
+  async findById(id: string, userId: string): Promise<WorkflowRow | undefined> {
+    const { data, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) return undefined;
+    return {
+      ...data,
+      workflow_json: typeof data.workflow_json === 'string' ? data.workflow_json : JSON.stringify(data.workflow_json),
+    };
+  },
+
+  // Internal: find by ID without user check (for webhook/executor use)
+  async findByIdInternal(id: string): Promise<WorkflowRow | undefined> {
+    const { data, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return undefined;
+    return {
+      ...data,
+      workflow_json: typeof data.workflow_json === 'string' ? data.workflow_json : JSON.stringify(data.workflow_json),
+    };
+  },
+
+  async create(userId: string, data: { name: string; description?: string; workflow_json: string; node_count: number; has_unsupported_nodes: boolean }): Promise<string> {
+    let parsedJson: any;
+    try {
+      parsedJson = JSON.parse(data.workflow_json);
+    } catch {
+      parsedJson = { name: data.name, nodes: [], connections: {} };
     }
-    stmt.free();
-    return row;
+
+    const { data: row, error } = await supabase
+      .from('workflows')
+      .insert({
+        user_id: userId,
+        name: data.name,
+        description: data.description || '',
+        workflow_json: parsedJson,
+        node_count: data.node_count,
+        has_unsupported_nodes: data.has_unsupported_nodes,
+      })
+      .select('id')
+      .single();
+
+    if (error || !row) throw new Error(`Failed to create workflow: ${error?.message}`);
+    return row.id;
   },
 
-  create(data: { name: string; description?: string; workflow_json: string; node_count: number; has_unsupported_nodes: boolean }): string {
-    const id = uuid();
-    const now = new Date().toISOString();
-    getDb().run(
-      `INSERT INTO workflows (id, name, description, workflow_json, node_count, has_unsupported_nodes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, data.name, data.description || '', data.workflow_json, data.node_count, data.has_unsupported_nodes ? 1 : 0, now, now]
-    );
-    saveDatabase();
-    return id;
+  async update(id: string, userId: string, fields: { name?: string; description?: string; workflow_json?: string; is_active?: boolean; node_count?: number; has_unsupported_nodes?: boolean }): Promise<boolean> {
+    const updates: Record<string, unknown> = {};
+
+    if (fields.name !== undefined) updates.name = fields.name;
+    if (fields.description !== undefined) updates.description = fields.description;
+    if (fields.is_active !== undefined) updates.is_active = fields.is_active;
+    if (fields.node_count !== undefined) updates.node_count = fields.node_count;
+    if (fields.has_unsupported_nodes !== undefined) updates.has_unsupported_nodes = fields.has_unsupported_nodes;
+    if (fields.workflow_json !== undefined) {
+      try {
+        updates.workflow_json = JSON.parse(fields.workflow_json);
+      } catch {
+        updates.workflow_json = fields.workflow_json;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) return true;
+
+    const { data: rows, error } = await supabase
+      .from('workflows')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) throw new Error(`Failed to update workflow: ${error.message}`);
+    return (rows?.length ?? 0) > 0;
   },
 
-  update(id: string, data: { name?: string; description?: string; workflow_json?: string; is_active?: boolean; node_count?: number; has_unsupported_nodes?: boolean }): boolean {
-    const existing = this.findById(id);
-    if (!existing) return false;
+  async delete(id: string, userId: string): Promise<boolean> {
+    const { data: rows, error } = await supabase
+      .from('workflows')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id');
 
-    const updates: string[] = [];
-    const values: unknown[] = [];
-
-    if (data.name !== undefined) { updates.push('name = ?'); values.push(data.name); }
-    if (data.description !== undefined) { updates.push('description = ?'); values.push(data.description); }
-    if (data.workflow_json !== undefined) { updates.push('workflow_json = ?'); values.push(data.workflow_json); }
-    if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active ? 1 : 0); }
-    if (data.node_count !== undefined) { updates.push('node_count = ?'); values.push(data.node_count); }
-    if (data.has_unsupported_nodes !== undefined) { updates.push('has_unsupported_nodes = ?'); values.push(data.has_unsupported_nodes ? 1 : 0); }
-
-    if (updates.length === 0) return true;
-
-    updates.push("updated_at = ?");
-    values.push(new Date().toISOString());
-    values.push(id);
-
-    getDb().run(`UPDATE workflows SET ${updates.join(', ')} WHERE id = ?`, values);
-    saveDatabase();
-    return true;
+    if (error) throw new Error(`Failed to delete workflow: ${error.message}`);
+    return (rows?.length ?? 0) > 0;
   },
 
-  delete(id: string): boolean {
-    const existing = this.findById(id);
-    if (!existing) return false;
-    getDb().run('DELETE FROM workflows WHERE id = ?', [id]);
-    saveDatabase();
-    return true;
-  },
-
-  duplicate(id: string): string | null {
-    const existing = this.findById(id);
+  async duplicate(id: string, userId: string): Promise<string | null> {
+    const existing = await this.findById(id, userId);
     if (!existing) return null;
-    return this.create({
+    return this.create(userId, {
       name: `${existing.name} (Copy)`,
       description: existing.description,
       workflow_json: existing.workflow_json,
       node_count: existing.node_count,
-      has_unsupported_nodes: existing.has_unsupported_nodes === 1,
+      has_unsupported_nodes: existing.has_unsupported_nodes,
     });
+  },
+
+  // Used by webhook route to find workflows by active status across all users
+  async findAllActive(): Promise<WorkflowRow[]> {
+    const { data, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error || !data) return [];
+    return data.map(w => ({
+      ...w,
+      workflow_json: typeof w.workflow_json === 'string' ? w.workflow_json : JSON.stringify(w.workflow_json),
+    }));
   },
 };

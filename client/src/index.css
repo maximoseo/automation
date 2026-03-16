@@ -77,6 +77,12 @@
   background-color: hsl(var(--background));
 }
 
+/* Auth loading shimmer */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

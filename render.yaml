@@ -10,11 +10,18 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_PATH
-        value: /opt/render/project/src/data/automation.db
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
       - key: ENCRYPTION_KEY
         generateValue: true
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: CLIENT_ORIGIN
+        value: https://automation.maximo-seo.ai
+      # Client-side env vars (baked into the JS bundle at build time)
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
