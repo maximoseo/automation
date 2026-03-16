@@ -67,13 +67,19 @@ CREATE INDEX IF NOT EXISTS idx_executions_created ON executions(created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_node_executions_execution ON node_executions(execution_id);
 
 -- ==========================================
--- ROW LEVEL SECURITY
+-- ROW LEVEL SECURITY (Optional)
 -- ==========================================
+-- RLS provides database-level access control. The server also filters
+-- by user_id in every query, so data isolation works even without RLS.
+-- Enable RLS when you have the service_role key configured in Render,
+-- since the service_role key bypasses RLS for server-side operations.
+--
+-- To enable later, uncomment the lines below:
 
-ALTER TABLE workflows ENABLE ROW LEVEL SECURITY;
-ALTER TABLE credentials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE node_executions ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE workflows ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE credentials ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE node_executions ENABLE ROW LEVEL SECURITY;
 
 -- Workflows: users can only access their own
 CREATE POLICY workflows_select ON workflows FOR SELECT USING (auth.uid() = user_id);
