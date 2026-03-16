@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: automation-workflow-builder
+    runtime: node
+    plan: starter
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/data/automation.db
+      - key: ENCRYPTION_KEY
+        generateValue: true
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
