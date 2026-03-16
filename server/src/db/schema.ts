@@ -4,14 +4,36 @@ import path from 'path';
 
 let db: Database;
 
-const DB_PATH = process.env.DATABASE_PATH || './data/automation.db';
+const DEFAULT_DB_PATH = process.env.DATABASE_PATH || './data/automation.db';
+
+function resolveDbPath(): string {
+  const dbDir = path.dirname(DEFAULT_DB_PATH);
+  try {
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+    // Test writability
+    const testFile = path.join(dbDir, '.write-test');
+    fs.writeFileSync(testFile, '');
+    fs.unlinkSync(testFile);
+    return DEFAULT_DB_PATH;
+  } catch {
+    // Fallback to project-local data directory
+    const fallback = path.join(process.cwd(), 'data', 'automation.db');
+    const fallbackDir = path.dirname(fallback);
+    if (!fs.existsSync(fallbackDir)) {
+      fs.mkdirSync(fallbackDir, { recursive: true });
+    }
+    console.warn(`Cannot write to ${dbDir}, falling back to ${fallback}`);
+    return fallback;
+  }
+}
+
+let DB_PATH: string;
 
 export async function initDatabase(): Promise<Database> {
   const SQL = await initSqlJs();
-  const dbDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
+  DB_PATH = resolveDbPath();
 
   if (fs.existsSync(DB_PATH)) {
     const buffer = fs.readFileSync(DB_PATH);

@@ -1,7 +1,8 @@
 services:
   - type: web
-    name: automation-workflow-builder
+    name: automation
     runtime: node
+    region: frankfurt
     plan: starter
     buildCommand: npm run install:all && npm run build
     startCommand: npm start
@@ -10,7 +11,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_PATH
-        value: /var/data/automation.db
+        value: /opt/render/project/src/data/automation.db
       - key: ENCRYPTION_KEY
         generateValue: true
     disk:
