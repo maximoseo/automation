@@ -14,7 +14,7 @@
     "copy:client": "cp -r client/dist server/dist/server/src/public",
     "start": "cd server && npm start",
     "lint": "concurrently \"cd client && npm run lint\" \"cd server && npm run lint\"",
-    "install:all": "npm install && cd shared && npm install && cd ../server && npm install && cd ../client && npm install"
+    "install:all": "npm install --include=dev && cd shared && npm install --include=dev && cd ../server && npm install --include=dev && cd ../client && npm install --include=dev"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
