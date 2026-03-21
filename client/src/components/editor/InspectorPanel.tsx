@@ -8,17 +8,44 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export function InspectorPanel() {
   const { nodes, selectedNodeId, updateNodeData, deleteNode, selectNode } = useEditorStore();
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
+  const [collapsed, setCollapsed] = useState(false);
+
+  if (collapsed) {
+    return (
+      <div className="w-10 border-l border-border/50 bg-card flex flex-col items-center py-2">
+        <button
+          className="p-1.5 rounded-md hover:bg-accent transition-colors cursor-pointer"
+          onClick={() => setCollapsed(false)}
+          title="Expand inspector"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
 
   if (!selectedNode) {
     return (
-      <div className="w-80 border-l bg-card flex items-center justify-center text-muted-foreground text-sm p-4 text-center">
-        Select a node to inspect its properties
+      <div className="w-72 border-l border-border/50 bg-card flex flex-col">
+        <div className="p-3 border-b border-border/50 flex items-center justify-between">
+          <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Inspector</h3>
+          <button
+            className="p-1 rounded-md hover:bg-accent transition-colors cursor-pointer"
+            onClick={() => setCollapsed(true)}
+            title="Collapse inspector"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <p className="text-muted-foreground text-sm text-center">Select a node to inspect its properties</p>
+        </div>
       </div>
     );
   }
@@ -37,14 +64,14 @@ export function InspectorPanel() {
   }
 
   return (
-    <div className="w-80 border-l bg-card flex flex-col h-full">
-      <div className="p-3 border-b flex items-center justify-between">
-        <h3 className="font-semibold text-sm">Inspector</h3>
+    <div className="w-72 border-l border-border/50 bg-card flex flex-col h-full">
+      <div className="p-3 border-b border-border/50 flex items-center justify-between">
+        <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Inspector</h3>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteNode(selectedNode.id)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 cursor-pointer hover:text-destructive hover:bg-destructive/10" onClick={() => deleteNode(selectedNode.id)} title="Delete node">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => selectNode(null)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 cursor-pointer" onClick={() => selectNode(null)} title="Close">
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -59,20 +86,18 @@ export function InspectorPanel() {
         <ScrollArea className="flex-1">
           <TabsContent value="params" className="p-3 space-y-4 mt-0">
             {/* Node info */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant={
-                  config?.supportLevel === 'full' ? 'success' :
-                  config?.supportLevel === 'partial' ? 'warning' : 'destructive'
-                }>
-                  {config?.supportLevel || 'unknown'}
-                </Badge>
-                <span className="text-xs text-muted-foreground">{config?.displayName || selectedNode.data.nodeType as string}</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={
+                config?.supportLevel === 'full' ? 'success' :
+                config?.supportLevel === 'partial' ? 'warning' : 'destructive'
+              }>
+                {config?.supportLevel || 'unknown'}
+              </Badge>
+              <span className="text-xs text-muted-foreground">{config?.displayName || selectedNode.data.nodeType as string}</span>
             </div>
 
             {/* Node name */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs">Node Name</Label>
               <Input
                 value={(selectedNode.data.label as string) || ''}
@@ -112,7 +137,7 @@ function renderParameters(
     if (typeof value === 'string') {
       const isLong = value.length > 100 || key === 'jsCode' || key === 'text' || key === 'body' || key === 'responseBody';
       fields.push(
-        <div key={key} className="space-y-1">
+        <div key={key} className="space-y-1.5">
           <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</Label>
           {isLong ? (
             <Textarea
@@ -132,7 +157,7 @@ function renderParameters(
       );
     } else if (typeof value === 'number') {
       fields.push(
-        <div key={key} className="space-y-1">
+        <div key={key} className="space-y-1.5">
           <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</Label>
           <Input
             type="number"
@@ -144,19 +169,19 @@ function renderParameters(
       );
     } else if (typeof value === 'boolean') {
       fields.push(
-        <div key={key} className="flex items-center justify-between">
+        <div key={key} className="flex items-center justify-between py-1">
           <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</Label>
-          <input
-            type="checkbox"
-            checked={value}
-            onChange={e => onChange(key, e.target.checked)}
-            className="h-4 w-4 rounded border-border"
-          />
+          <button
+            onClick={() => onChange(key, !value)}
+            className={`relative h-5 w-9 rounded-full transition-colors duration-200 cursor-pointer ${value ? 'bg-primary' : 'bg-muted'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${value ? 'translate-x-4' : ''}`} />
+          </button>
         </div>
       );
     } else if (typeof value === 'object' && value !== null) {
       fields.push(
-        <div key={key} className="space-y-1">
+        <div key={key} className="space-y-1.5">
           <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</Label>
           <Textarea
             value={JSON.stringify(value, null, 2)}

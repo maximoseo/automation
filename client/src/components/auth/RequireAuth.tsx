@@ -6,24 +6,22 @@ export function RequireAuth() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // Show a loading screen while checking auth — prevents content flicker
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary animate-pulse" />
-            <span className="text-xl font-bold text-foreground">Automation</span>
+          <div className="h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Zap className="h-6 w-6 text-primary animate-pulse" />
           </div>
-          <div className="h-1 w-48 overflow-hidden rounded-full bg-muted">
+          <div className="h-1 w-40 overflow-hidden rounded-full bg-muted">
             <div className="h-full w-1/2 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary/60" />
           </div>
+          <span className="text-sm text-muted-foreground">Loading...</span>
         </div>
       </div>
     );
   }
 
-  // Not authenticated — redirect to login, preserving intended destination
   if (!user) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }

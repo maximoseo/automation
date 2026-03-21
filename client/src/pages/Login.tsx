@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Zap, Loader2, AlertCircle } from 'lucide-react';
+import { Zap, Loader2, AlertCircle, Workflow, Play, Shield } from 'lucide-react';
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
@@ -16,16 +16,21 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Already authenticated — redirect to intended page
   if (!loading && user) {
     return <Navigate to={from} replace />;
   }
 
-  // Still loading initial auth check
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <Zap className="h-8 w-8 text-primary animate-pulse" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Zap className="h-6 w-6 text-primary animate-pulse" />
+          </div>
+          <div className="h-1 w-32 overflow-hidden rounded-full bg-muted">
+            <div className="h-full w-1/2 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-primary/60" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -40,34 +45,45 @@ export default function Login() {
       setError(result.error);
       setSubmitting(false);
     }
-    // On success, the auth state change will trigger a redirect via the Navigate above
   }
 
   return (
     <div className="flex min-h-screen bg-background">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center items-center bg-gradient-to-br from-primary/10 via-background to-primary/5 px-12">
-        <div className="max-w-md text-center">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center items-center bg-gradient-to-br from-primary/8 via-background to-primary/5 px-12 relative overflow-hidden">
+        {/* Subtle decorative elements */}
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-primary/5 rounded-full blur-3xl" />
+
+        <div className="max-w-md text-center relative z-10">
           <div className="flex items-center justify-center gap-3 mb-8">
-            <Zap className="h-12 w-12 text-primary" />
-            <span className="text-4xl font-bold text-foreground">Automation</span>
+            <div className="h-14 w-14 rounded-2xl bg-primary/15 flex items-center justify-center">
+              <Zap className="h-8 w-8 text-primary" />
+            </div>
+            <span className="text-4xl font-bold text-foreground tracking-tight">Automation</span>
           </div>
           <p className="text-lg text-muted-foreground leading-relaxed">
-            Build, test, and deploy powerful workflows with an n8n-compatible visual editor.
+            Build, test, and deploy powerful workflows with a visual editor.
             Connect APIs, transform data, and automate your processes.
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-6 text-center">
-            <div>
-              <div className="text-2xl font-bold text-primary">17+</div>
-              <div className="text-xs text-muted-foreground mt-1">Node Types</div>
+          <div className="mt-12 grid grid-cols-3 gap-8">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Workflow className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-xs text-muted-foreground font-medium">Visual Editor</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-primary">Visual</div>
-              <div className="text-xs text-muted-foreground mt-1">Editor</div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Play className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-xs text-muted-foreground font-medium">Real-time Runs</div>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-primary">Real-time</div>
-              <div className="text-xs text-muted-foreground mt-1">Execution</div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-xs text-muted-foreground font-medium">Secure & Fast</div>
             </div>
           </div>
         </div>
@@ -77,21 +93,23 @@ export default function Login() {
       <div className="flex w-full lg:w-1/2 flex-col justify-center items-center px-6 sm:px-12">
         <div className="w-full max-w-sm">
           {/* Mobile branding */}
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <Zap className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold text-foreground">Automation</span>
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-10">
+            <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
+              <Zap className="h-5 w-5 text-primary" />
+            </div>
+            <span className="text-2xl font-bold text-foreground tracking-tight">Automation</span>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Welcome back</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Enter your credentials to access your workflows.
+              Sign in to access your automation workflows.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <div className="flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-400">
                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -117,7 +135,7 @@ export default function Login() {
               <Input
                 id="password"
                 type="password"
-                placeholder="Your password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -142,9 +160,9 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-xs text-muted-foreground">
+          <p className="mt-10 text-center text-xs text-muted-foreground">
             Part of the{' '}
-            <a href="https://maximo-seo.ai" className="underline hover:text-foreground transition-colors" target="_blank" rel="noopener">
+            <a href="https://maximo-seo.ai" className="text-primary/80 hover:text-primary transition-colors" target="_blank" rel="noopener">
               Maximo SEO
             </a>{' '}
             ecosystem

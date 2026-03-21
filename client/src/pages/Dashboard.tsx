@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Upload, MoreVertical, Play, Copy, Trash2, FileDown, Search } from 'lucide-react';
+import { Plus, Upload, Play, Copy, Trash2, Search, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,27 +62,29 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-5 lg:p-8 max-w-7xl mx-auto">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Workflows</h1>
-          <p className="text-muted-foreground mt-1">Build and manage your automation workflows</p>
+          <h1 className="text-2xl font-bold tracking-tight">Workflows</h1>
+          <p className="text-muted-foreground text-sm mt-1">Build and manage your automation workflows</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
             Import
           </Button>
-          <Button onClick={handleNew}>
+          <Button size="sm" onClick={handleNew}>
             <Plus className="h-4 w-4 mr-2" />
             New Workflow
           </Button>
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search workflows..."
             value={search}
@@ -92,16 +94,17 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Workflow grid */}
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
-                <div className="h-5 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+                <div className="h-4 bg-muted rounded w-3/4" />
+                <div className="h-3 bg-muted rounded w-1/2 mt-2" />
               </CardHeader>
               <CardContent>
-                <div className="h-4 bg-muted rounded w-full" />
+                <div className="h-3 bg-muted rounded w-full" />
               </CardContent>
             </Card>
           ))}
@@ -109,61 +112,71 @@ export default function Dashboard() {
       ) : filtered && filtered.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map(wf => (
-            <Card key={wf.id} className="hover:border-primary/50 transition-colors cursor-pointer group" onClick={() => navigate(`/workflow/${wf.id}`)}>
+            <Card
+              key={wf.id}
+              className="hover:border-primary/40 hover:shadow-glow cursor-pointer group"
+              onClick={() => navigate(`/workflow/${wf.id}`)}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <CardTitle className="text-base">{wf.name}</CardTitle>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"
-                      onClick={() => executeMutation.mutate(wf.id)}>
+                  <CardTitle className="text-sm font-semibold">{wf.name}</CardTitle>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer"
+                      onClick={() => executeMutation.mutate(wf.id)} title="Run">
                       <Play className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"
-                      onClick={() => duplicateMutation.mutate(wf.id)}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer"
+                      onClick={() => duplicateMutation.mutate(wf.id)} title="Duplicate">
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"
+                    <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer hover:text-destructive hover:bg-destructive/10"
                       onClick={() => {
                         if (confirm('Delete this workflow?')) deleteMutation.mutate(wf.id);
-                      }}>
+                      }} title="Delete">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
-                <CardDescription className="line-clamp-2">{wf.description || 'No description'}</CardDescription>
+                <CardDescription className="line-clamp-2 text-xs">{wf.description || 'No description'}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary">{wf.node_count} nodes</Badge>
-                  {wf.has_unsupported_nodes && <Badge variant="warning">Partial</Badge>}
+                <div className="flex items-center flex-wrap gap-2 text-xs text-muted-foreground">
+                  <Badge variant="secondary" className="text-xs">{wf.node_count} nodes</Badge>
+                  {wf.has_unsupported_nodes && <Badge variant="warning" className="text-xs">Partial</Badge>}
                   {statusBadge(wf.last_execution_status)}
-                  <span className="ml-auto">{formatDate(wf.updated_at)}</span>
+                  <span className="ml-auto text-xs">{formatDate(wf.updated_at)}</span>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <Card className="text-center py-12">
+        <Card className="text-center py-16">
           <CardContent>
-            <div className="text-muted-foreground mb-4">
-              <p className="text-lg font-medium">No workflows yet</p>
-              <p className="text-sm mt-1">Create a new workflow or import an existing n8n workflow JSON</p>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button variant="outline" onClick={() => setImportOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </Button>
-              <Button onClick={handleNew}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Workflow
-              </Button>
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Workflow className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <p className="text-base font-medium text-foreground">No workflows yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Create a new workflow or import an existing n8n workflow</p>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import
+                </Button>
+                <Button size="sm" onClick={handleNew}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Workflow
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
+      {/* Import dialog */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -172,10 +185,14 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Input type="file" accept=".json" onChange={handleFileImport} />
+              <label className="flex items-center justify-center w-full h-10 rounded-lg border-2 border-dashed border-input hover:border-primary/40 transition-colors cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                <Upload className="h-4 w-4 mr-2" />
+                Choose a JSON file
+                <input type="file" accept=".json" onChange={handleFileImport} className="hidden" />
+              </label>
             </div>
             <Textarea
-              placeholder="Paste n8n workflow JSON here..."
+              placeholder="Or paste n8n workflow JSON here..."
               value={importJson}
               onChange={e => setImportJson(e.target.value)}
               rows={12}

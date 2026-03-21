@@ -24,7 +24,6 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps) {
   const color = (data.color as string) || '#6b7280';
   const iconName = (data.icon as string) || 'Box';
   const supportLevel = (data.supportLevel as string) || 'full';
-  const category = (data.category as string) || 'action';
   const inputs = (data.inputs as number) ?? 1;
   const outputs = (data.outputs as number) ?? 1;
   const disabled = data.disabled as boolean;
@@ -33,14 +32,14 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps) {
   const nodeState = nodeStates.get(label);
 
   const statusColors: Record<string, string> = {
-    running: 'ring-2 ring-blue-500 animate-pulse',
-    success: 'ring-2 ring-green-500',
-    error: 'ring-2 ring-red-500',
+    running: 'ring-2 ring-indigo-500/60 animate-pulse',
+    success: 'ring-2 ring-emerald-500/60',
+    error: 'ring-2 ring-red-500/60',
   };
 
   const supportBadgeColors: Record<string, string> = {
-    full: 'bg-green-500',
-    partial: 'bg-yellow-500',
+    full: 'bg-emerald-500',
+    partial: 'bg-amber-500',
     'import-only': 'bg-orange-500',
     unsupported: 'bg-red-500',
   };
@@ -48,15 +47,15 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        'relative bg-card border-2 rounded-lg shadow-md min-w-[180px] transition-all',
-        selected ? 'border-primary shadow-lg shadow-primary/20' : 'border-border',
+        'relative bg-card border-2 rounded-xl shadow-md min-w-[180px] transition-all duration-200',
+        selected ? 'border-primary shadow-lg shadow-primary/20' : 'border-border/60 hover:border-border',
         disabled && 'opacity-50',
         nodeState && statusColors[nodeState.status],
       )}
       onClick={() => selectNode(id)}
     >
       {/* Support level indicator */}
-      <div className={cn('absolute -top-1 -right-1 w-3 h-3 rounded-full', supportBadgeColors[supportLevel])} />
+      <div className={cn('absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-card', supportBadgeColors[supportLevel])} />
 
       {/* Input handles */}
       {inputs > 0 && Array.from({ length: inputs }).map((_, i) => (
@@ -70,36 +69,36 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps) {
             background: color,
             width: 10,
             height: 10,
-            border: '2px solid hsl(var(--background))',
+            border: '2px solid hsl(var(--card))',
           }}
         />
       ))}
 
       {/* Node header */}
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-t-md"
-        style={{ backgroundColor: `${color}20` }}
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-t-[10px]"
+        style={{ backgroundColor: `${color}12` }}
       >
-        <div className="p-1 rounded" style={{ backgroundColor: `${color}30` }}>
+        <div className="p-1.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
           <Icon className="h-4 w-4" style={{ color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-medium truncate">{label}</div>
-          <div className="text-[10px] text-muted-foreground truncate">{displayName}</div>
+          <div className="text-xs font-semibold truncate">{label}</div>
+          <div className="text-xs text-muted-foreground truncate">{displayName}</div>
         </div>
       </div>
 
       {/* Node body with execution state */}
       {nodeState && (
-        <div className="px-3 py-1.5 text-[10px] border-t">
+        <div className="px-3 py-2 text-xs border-t border-border/30">
           {nodeState.status === 'success' && (
-            <span className="text-green-400">{nodeState.executionTimeMs}ms</span>
+            <span className="text-emerald-400 font-medium">{nodeState.executionTimeMs}ms</span>
           )}
           {nodeState.status === 'error' && (
             <span className="text-red-400 truncate block">{nodeState.error}</span>
           )}
           {nodeState.status === 'running' && (
-            <span className="text-blue-400">Running...</span>
+            <span className="text-indigo-400">Running...</span>
           )}
         </div>
       )}
@@ -116,7 +115,7 @@ function WorkflowNodeComponent({ id, data, selected }: NodeProps) {
             background: color,
             width: 10,
             height: 10,
-            border: '2px solid hsl(var(--background))',
+            border: '2px solid hsl(var(--card))',
           }}
         />
       ))}
